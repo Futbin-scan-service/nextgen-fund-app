@@ -14,7 +14,7 @@ header {visibility: hidden;}
 footer {visibility: hidden;}
 
 .block-container {
-    padding-top: 0.4rem;
+    padding-top: 0.6rem;
     padding-left: 1rem;
     padding-right: 1rem;
     max-width: 520px;
@@ -29,44 +29,12 @@ h1, h2, h3, p, label, span {
     color: #f1f5f9;
 }
 
-img {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.title {
-    text-align: center;
-    font-size: 24px;
-    font-weight: 800;
-    margin-top: 6px;
-    margin-bottom: 6px;
-    line-height: 1.25;
-}
-
-.subtitle {
-    text-align: center;
-    color: #a8b3c7;
-    font-size: 14px;
-    margin-bottom: 16px;
-    line-height: 1.4;
-}
-
 .neon-line {
     height: 3px;
     background: linear-gradient(90deg, #7c3aed, #22d3ee, #7c3aed);
     border-radius: 20px;
     margin: 14px 0 22px 0;
     box-shadow: 0 0 18px rgba(34, 211, 238, 0.65);
-}
-
-.card {
-    background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(17,24,39,0.92));
-    padding: 18px;
-    border-radius: 22px;
-    border: 1px solid #334155;
-    box-shadow: 0 0 25px rgba(0,0,0,0.35);
-    margin-bottom: 18px;
 }
 
 .metric-card {
@@ -124,17 +92,29 @@ def euro(value):
 
 df = load_data()
 
-st.image("logo.png", width=220)
+# Header: Logo links, Name rechts
+logo_col, title_col = st.columns([1, 2.2])
 
-st.markdown("""
-<div class="title">NextGen Robotics<br>AI & Tech Fund</div>
-<div class="subtitle">
-Teste live, wie stark monatliches Investieren langfristig wachsen könnte.
-</div>
-<div class="neon-line"></div>
-""", unsafe_allow_html=True)
+with logo_col:
+    st.image("logo.png", width=105)
 
-st.markdown('<div class="card">', unsafe_allow_html=True)
+with title_col:
+    st.markdown("""
+    <div style="
+        font-size: 25px;
+        font-weight: 800;
+        line-height: 1.12;
+        padding-top: 10px;
+        color: #ffffff;
+    ">
+        NextGen Robotics<br>
+        AI & Tech Fund
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown('<div class="neon-line"></div>', unsafe_allow_html=True)
+
+# Rechner
 st.markdown("## ⚙️ Rechner")
 
 monatlicher_betrag = st.slider(
@@ -163,8 +143,6 @@ rendite_option = st.selectbox(
     index=2
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 if "7 %" in rendite_option:
     r_annual = 0.07
 elif "10 %" in rendite_option:
@@ -190,7 +168,7 @@ for m in range(1, months + 1):
 profit = total_value - total_invested
 years_axis = list(range(0, len(values_history)))
 
-st.markdown('<div class="card">', unsafe_allow_html=True)
+# Ergebnis
 st.markdown("## 💰 Ergebnis")
 
 st.markdown(f"""
@@ -243,8 +221,6 @@ st.caption(
     "Hinweis: Vereinfachte Modellrechnung. Keine Anlageberatung. "
     "Zukünftige Renditen sind nicht garantiert."
 )
-
-st.markdown('</div>', unsafe_allow_html=True)
 
 with st.expander("📊 Fondszusammensetzung anzeigen"):
     df_sorted = df.sort_values(by="Allocation", ascending=True)
