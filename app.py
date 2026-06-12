@@ -3,9 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 st.set_page_config(
-    page_title="NextGen Robotics AI & Tech Fund",
+    page_title="NextGen Fund",
     page_icon="📈",
-    layout="wide"
+    layout="centered"
 )
 
 st.markdown("""
@@ -14,9 +14,10 @@ header {visibility: hidden;}
 footer {visibility: hidden;}
 
 .block-container {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-    max-width: 1500px;
+    padding-top: 0.8rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    max-width: 520px;
 }
 
 .stApp {
@@ -28,63 +29,65 @@ h1, h2, h3, p, label, span {
     color: #f1f5f9;
 }
 
-.small-text {
+.title {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 800;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.subtitle {
+    text-align: center;
     color: #a8b3c7;
-    font-size: 18px;
-    margin-top: -10px;
+    font-size: 14px;
+    margin-bottom: 18px;
 }
 
 .neon-line {
     height: 3px;
     background: linear-gradient(90deg, #7c3aed, #22d3ee, #7c3aed);
     border-radius: 20px;
-    margin: 18px 0 28px 0;
+    margin: 14px 0 22px 0;
     box-shadow: 0 0 18px rgba(34, 211, 238, 0.65);
 }
 
 .card {
     background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(17,24,39,0.92));
-    padding: 24px;
+    padding: 18px;
     border-radius: 22px;
     border: 1px solid #334155;
-    box-shadow: 0 0 30px rgba(0,0,0,0.35);
-}
-
-.logo-card {
-    background: linear-gradient(145deg, #0f172a, #111827);
-    padding: 14px;
-    border-radius: 18px;
-    border: 1px solid #7c3aed;
-    box-shadow: 0 0 24px rgba(124,58,237,0.55);
-    text-align: center;
+    box-shadow: 0 0 25px rgba(0,0,0,0.35);
+    margin-bottom: 18px;
 }
 
 .metric-card {
     background: linear-gradient(135deg, #111827, #1e1b4b);
-    padding: 22px;
-    border-radius: 20px;
+    padding: 18px;
+    border-radius: 18px;
     border: 1px solid #7c3aed;
-    box-shadow: 0 0 20px rgba(34, 211, 238, 0.22);
+    box-shadow: 0 0 18px rgba(34, 211, 238, 0.25);
+    margin-bottom: 12px;
 }
 
 .metric-label {
-    font-size: 16px;
+    font-size: 15px;
     color: #cbd5e1;
-    margin-bottom: 10px;
 }
 
 .metric-value {
     font-size: 34px;
     color: #22d3ee;
     font-weight: 800;
+    margin-top: 4px;
 }
 
-.stSlider, .stRadio {
+.stSlider, .stSelectbox {
     background: rgba(15,23,42,0.9);
-    padding: 18px;
-    border-radius: 18px;
+    padding: 14px;
+    border-radius: 16px;
     border: 1px solid #334155;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 
 div[data-testid="stExpander"] {
@@ -114,59 +117,49 @@ def euro(value):
 df = load_data()
 
 # Header
-col_logo, col_title = st.columns([1.1, 7])
+st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+st.image("logo.png", width=135)
+st.markdown("</div>", unsafe_allow_html=True)
 
-with col_logo:
-    st.markdown('<div class="logo-card">', unsafe_allow_html=True)
-    st.image("logo.png", use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown("""
+<div class="title">NextGen Robotics<br>AI & Tech Fund</div>
+<div class="subtitle">
+Teste live, wie stark monatliches Investieren langfristig wachsen könnte.
+</div>
+<div class="neon-line"></div>
+""", unsafe_allow_html=True)
 
-with col_title:
-    st.markdown("""
-    <h1 style="font-size:48px; margin-bottom:8px;">
-        NextGen Robotics AI & Tech Fund
-    </h1>
-    <p class="small-text">
-        Berechne in Sekunden, wie sich regelmäßiges Investieren langfristig entwickeln könnte.
-    </p>
-    """, unsafe_allow_html=True)
+# Rechner
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.markdown("## ⚙️ Rechner")
 
-st.markdown('<div class="neon-line"></div>', unsafe_allow_html=True)
+monatlicher_betrag = st.slider(
+    "Monatliche Sparrate (€)",
+    min_value=10,
+    max_value=500,
+    value=50,
+    step=10
+)
 
-# Layout
-left, right = st.columns([1, 2.45])
+jahre = st.slider(
+    "Anlagezeitraum (Jahre)",
+    min_value=1,
+    max_value=40,
+    value=20,
+    step=1
+)
 
-with left:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("<h2>⚙️ Rechner</h2>", unsafe_allow_html=True)
+rendite_option = st.selectbox(
+    "Erwartete Rendite",
+    [
+        "Konservativ: 7 % p.a.",
+        "Optimistisch: 10 % p.a.",
+        "Tech/Growth-Fokus: 12 % p.a."
+    ],
+    index=2
+)
 
-    monatlicher_betrag = st.slider(
-        "Monatliche Sparrate (€)",
-        min_value=10,
-        max_value=1000,
-        value=50,
-        step=10
-    )
-
-    jahre = st.slider(
-        "Anlagezeitraum (Jahre)",
-        min_value=1,
-        max_value=40,
-        value=7,
-        step=1
-    )
-
-    rendite_option = st.radio(
-        "Erwartete Rendite",
-        [
-            "Konservativ: 7 % p.a.",
-            "Optimistisch: 10 % p.a.",
-            "Tech/Growth-Fokus: 12 % p.a."
-        ],
-        index=2
-    )
-
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 if "7 %" in rendite_option:
     r_annual = 0.07
@@ -193,85 +186,83 @@ for m in range(1, months + 1):
 profit = total_value - total_invested
 years_axis = list(range(0, len(values_history)))
 
-with right:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("<h2>💰 Ergebnis</h2>", unsafe_allow_html=True)
+# Ergebnis
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.markdown("## 💰 Ergebnis")
 
-    c1, c2, c3 = st.columns(3)
+st.markdown(f"""
+<div class="metric-card">
+    <div class="metric-label">Möglicher Depotwert</div>
+    <div class="metric-value">{euro(total_value)}</div>
+</div>
+""", unsafe_allow_html=True)
 
-    with c1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Depotwert</div>
-            <div class="metric-value">{euro(total_value)}</div>
-        </div>
-        """, unsafe_allow_html=True)
+col_a, col_b = st.columns(2)
 
-    with c2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Einzahlungen</div>
-            <div class="metric-value">{euro(total_invested)}</div>
-        </div>
-        """, unsafe_allow_html=True)
+with col_a:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Einzahlungen</div>
+        <div class="metric-value" style="font-size:24px;">{euro(total_invested)}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with c3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Gewinn</div>
-            <div class="metric-value">{euro(profit)}</div>
-        </div>
-        """, unsafe_allow_html=True)
+with col_b:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Gewinn</div>
+        <div class="metric-value" style="font-size:24px;">{euro(profit)}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    fig, ax = plt.subplots(figsize=(13, 5.8))
-    fig.patch.set_facecolor("#111827")
-    ax.set_facecolor("#111827")
+fig, ax = plt.subplots(figsize=(5.2, 3.7))
+fig.patch.set_facecolor("#111827")
+ax.set_facecolor("#111827")
 
-    ax.fill_between(
-        years_axis,
-        invested_history,
-        color="#7c3aed",
-        alpha=0.9,
-        label="Einzahlungen"
-    )
+ax.fill_between(
+    years_axis,
+    invested_history,
+    color="#7c3aed",
+    alpha=0.9,
+    label="Einzahlungen"
+)
 
-    ax.fill_between(
-        years_axis,
-        invested_history,
-        values_history,
-        color="#22d3ee",
-        alpha=0.85,
-        label="Zinseszins / Gewinn"
-    )
+ax.fill_between(
+    years_axis,
+    invested_history,
+    values_history,
+    color="#22d3ee",
+    alpha=0.85,
+    label="Gewinn"
+)
 
-    ax.set_xlabel("Jahre", color="white", fontsize=12)
-    ax.set_ylabel("Betrag (€)", color="white", fontsize=12)
-    ax.tick_params(colors="white")
-    ax.grid(alpha=0.22)
+ax.set_xlabel("Jahre", color="white", fontsize=9)
+ax.set_ylabel("€", color="white", fontsize=9)
+ax.tick_params(colors="white", labelsize=8)
+ax.grid(alpha=0.22)
 
-    ax.get_yaxis().set_major_formatter(
-        plt.FuncFormatter(lambda x, loc: f"{int(x):,} €".replace(",", "."))
-    )
+ax.get_yaxis().set_major_formatter(
+    plt.FuncFormatter(lambda x, loc: f"{int(x):,}".replace(",", "."))
+)
 
-    ax.legend(loc="upper left")
-    ax.set_xlim(0, jahre)
+ax.legend(loc="upper left", fontsize=8)
+ax.set_xlim(0, jahre)
 
-    st.pyplot(fig)
+st.pyplot(fig)
 
-    st.caption(
-        "Hinweis: Dies ist eine vereinfachte Modellrechnung und keine Anlageberatung. "
-        "Zukünftige Renditen sind nicht garantiert."
-    )
+st.caption(
+    "Hinweis: Vereinfachte Modellrechnung. Keine Anlageberatung. "
+    "Zukünftige Renditen sind nicht garantiert."
+)
 
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("")
-
+# Fonds-Zusammensetzung
 with st.expander("📊 Fondszusammensetzung anzeigen"):
     df_sorted = df.sort_values(by="Allocation", ascending=True)
-    top_holdings = df_sorted.tail(15)
+    top_holdings = df_sorted.tail(10)
 
-    fig2, ax2 = plt.subplots(figsize=(12, 5))
+    fig2, ax2 = plt.subplots(figsize=(5.2, 3.8))
     fig2.patch.set_facecolor("#111827")
     ax2.set_facecolor("#111827")
 
@@ -281,9 +272,9 @@ with st.expander("📊 Fondszusammensetzung anzeigen"):
         color="#22d3ee"
     )
 
-    ax2.set_xlabel("Gewichtung im Fonds (%)", color="white")
-    ax2.set_title("Top 15 Holdings unseres Fonds", color="white")
-    ax2.tick_params(colors="white")
+    ax2.set_xlabel("Gewichtung (%)", color="white", fontsize=9)
+    ax2.set_title("Top Holdings", color="white", fontsize=11)
+    ax2.tick_params(colors="white", labelsize=8)
     ax2.grid(axis="x", alpha=0.2)
 
     for bar in bars:
@@ -294,8 +285,7 @@ with st.expander("📊 Fondszusammensetzung anzeigen"):
             f"{width}%",
             va="center",
             ha="left",
-            fontsize=9,
-            fontweight="bold",
+            fontsize=8,
             color="white"
         )
 
