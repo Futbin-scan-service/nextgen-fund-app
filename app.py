@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import base64
 
 st.set_page_config(
     page_title="NextGen Fund",
@@ -29,12 +30,66 @@ h1, h2, h3, p, label, span {
     color: #f1f5f9;
 }
 
+.logo-animate {
+    animation:
+        logoIntro 1.1s ease-out,
+        logoGlow 2.4s ease-in-out infinite alternate;
+}
+
+@keyframes logoIntro {
+    0% {
+        opacity: 0;
+        transform: scale(0.75) translateY(-12px);
+        filter: blur(6px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+    }
+}
+
+@keyframes logoGlow {
+    from {
+        filter: drop-shadow(0 0 6px rgba(124,58,237,0.45));
+    }
+    to {
+        filter: drop-shadow(0 0 18px rgba(34,211,238,0.75));
+    }
+}
+
+.title-animate {
+    animation: titleIntro 1.1s ease-out;
+}
+
+@keyframes titleIntro {
+    0% {
+        opacity: 0;
+        transform: translateX(18px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
 .neon-line {
     height: 3px;
     background: linear-gradient(90deg, #7c3aed, #22d3ee, #7c3aed);
+    background-size: 200% 100%;
     border-radius: 20px;
     margin: 14px 0 22px 0;
     box-shadow: 0 0 18px rgba(34, 211, 238, 0.65);
+    animation: neonFlow 4s linear infinite;
+}
+
+@keyframes neonFlow {
+    from {
+        background-position: 0% 50%;
+    }
+    to {
+        background-position: 200% 50%;
+    }
 }
 
 .metric-card {
@@ -90,17 +145,27 @@ def euro(value):
     return f"{value:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-df = load_data()
+def image_to_base64(path):
+    with open(path, "rb") as file:
+        return base64.b64encode(file.read()).decode()
 
-# Header: Logo links, Name rechts
+
+df = load_data()
+logo_base64 = image_to_base64("logo.png")
+
 logo_col, title_col = st.columns([1, 2.2])
 
 with logo_col:
-    st.image("logo.png", width=105)
+    st.markdown(f"""
+    <img
+        class="logo-animate"
+        src="data:image/png;base64,{logo_base64}"
+        style="width:105px; max-width:100%;">
+    """, unsafe_allow_html=True)
 
 with title_col:
     st.markdown("""
-    <div style="
+    <div class="title-animate" style="
         font-size: 25px;
         font-weight: 800;
         line-height: 1.12;
@@ -114,7 +179,6 @@ with title_col:
 
 st.markdown('<div class="neon-line"></div>', unsafe_allow_html=True)
 
-# Rechner
 st.markdown("## ⚙️ Rechner")
 
 monatlicher_betrag = st.slider(
@@ -168,7 +232,6 @@ for m in range(1, months + 1):
 profit = total_value - total_invested
 years_axis = list(range(0, len(values_history)))
 
-# Ergebnis
 st.markdown("## 💰 Ergebnis")
 
 st.markdown(f"""
@@ -200,8 +263,22 @@ fig, ax = plt.subplots(figsize=(5.2, 3.7))
 fig.patch.set_facecolor("#111827")
 ax.set_facecolor("#111827")
 
-ax.fill_between(years_axis, invested_history, color="#7c3aed", alpha=0.9, label="Einzahlungen")
-ax.fill_between(years_axis, invested_history, values_history, color="#22d3ee", alpha=0.85, label="Gewinn")
+ax.fill_between(
+    years_axis,
+    invested_history,
+    color="#7c3aed",
+    alpha=0.9,
+    label="Einzahlungen"
+)
+
+ax.fill_between(
+    years_axis,
+    invested_history,
+    values_history,
+    color="#22d3ee",
+    alpha=0.85,
+    label="Gewinn"
+)
 
 ax.set_xlabel("Jahre", color="white", fontsize=9)
 ax.set_ylabel("€", color="white", fontsize=9)
