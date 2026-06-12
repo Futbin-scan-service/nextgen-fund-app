@@ -14,7 +14,7 @@ header {visibility: hidden;}
 footer {visibility: hidden;}
 
 .block-container {
-    padding-top: 0.8rem;
+    padding-top: 0.4rem;
     padding-left: 1rem;
     padding-right: 1rem;
     max-width: 520px;
@@ -29,19 +29,27 @@ h1, h2, h3, p, label, span {
     color: #f1f5f9;
 }
 
+img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 .title {
     text-align: center;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 800;
-    margin-top: 8px;
-    margin-bottom: 4px;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    line-height: 1.25;
 }
 
 .subtitle {
     text-align: center;
     color: #a8b3c7;
     font-size: 14px;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
+    line-height: 1.4;
 }
 
 .neon-line {
@@ -76,7 +84,7 @@ h1, h2, h3, p, label, span {
 }
 
 .metric-value {
-    font-size: 34px;
+    font-size: 32px;
     color: #22d3ee;
     font-weight: 800;
     margin-top: 4px;
@@ -116,10 +124,7 @@ def euro(value):
 
 df = load_data()
 
-# Header
-st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
-st.image("logo.png", width=135)
-st.markdown("</div>", unsafe_allow_html=True)
+st.image("logo.png", width=220)
 
 st.markdown("""
 <div class="title">NextGen Robotics<br>AI & Tech Fund</div>
@@ -129,7 +134,6 @@ Teste live, wie stark monatliches Investieren langfristig wachsen könnte.
 <div class="neon-line"></div>
 """, unsafe_allow_html=True)
 
-# Rechner
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown("## ⚙️ Rechner")
 
@@ -186,7 +190,6 @@ for m in range(1, months + 1):
 profit = total_value - total_invested
 years_axis = list(range(0, len(values_history)))
 
-# Ergebnis
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown("## 💰 Ergebnis")
 
@@ -203,7 +206,7 @@ with col_a:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Einzahlungen</div>
-        <div class="metric-value" style="font-size:24px;">{euro(total_invested)}</div>
+        <div class="metric-value" style="font-size:22px;">{euro(total_invested)}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -211,7 +214,7 @@ with col_b:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Gewinn</div>
-        <div class="metric-value" style="font-size:24px;">{euro(profit)}</div>
+        <div class="metric-value" style="font-size:22px;">{euro(profit)}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -219,22 +222,8 @@ fig, ax = plt.subplots(figsize=(5.2, 3.7))
 fig.patch.set_facecolor("#111827")
 ax.set_facecolor("#111827")
 
-ax.fill_between(
-    years_axis,
-    invested_history,
-    color="#7c3aed",
-    alpha=0.9,
-    label="Einzahlungen"
-)
-
-ax.fill_between(
-    years_axis,
-    invested_history,
-    values_history,
-    color="#22d3ee",
-    alpha=0.85,
-    label="Gewinn"
-)
+ax.fill_between(years_axis, invested_history, color="#7c3aed", alpha=0.9, label="Einzahlungen")
+ax.fill_between(years_axis, invested_history, values_history, color="#22d3ee", alpha=0.85, label="Gewinn")
 
 ax.set_xlabel("Jahre", color="white", fontsize=9)
 ax.set_ylabel("€", color="white", fontsize=9)
@@ -257,7 +246,6 @@ st.caption(
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Fonds-Zusammensetzung
 with st.expander("📊 Fondszusammensetzung anzeigen"):
     df_sorted = df.sort_values(by="Allocation", ascending=True)
     top_holdings = df_sorted.tail(10)
