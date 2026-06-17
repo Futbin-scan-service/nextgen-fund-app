@@ -16,7 +16,7 @@ header {visibility: hidden;}
 footer {visibility: hidden;}
 
 .block-container {
-    padding-top: 1rem;
+    padding-top: 0.8rem;
     padding-bottom: 2rem;
     max-width: 760px;
 }
@@ -32,19 +32,19 @@ h1, h2, h3, p, label, span {
 
 .subtitle {
     color: #94a3b8;
-    font-size: 15px;
-    margin-top: -8px;
+    font-size: 14px;
+    margin-top: -6px;
 }
 
 .divider {
     height: 1px;
     background: #334155;
-    margin: 18px 0 22px 0;
+    margin: 16px 0 20px 0;
 }
 
 .metric-card {
     background: #111827;
-    padding: 18px;
+    padding: 17px;
     border-radius: 16px;
     border: 1px solid #334155;
     margin-bottom: 12px;
@@ -56,7 +56,7 @@ h1, h2, h3, p, label, span {
 }
 
 .metric-value {
-    font-size: 28px;
+    font-size: 27px;
     color: #38bdf8;
     font-weight: 800;
 }
@@ -64,13 +64,22 @@ h1, h2, h3, p, label, span {
 .stTabs [data-baseweb="tab"] {
     background: #111827;
     border-radius: 12px;
-    padding: 10px 14px;
+    padding: 9px 11px;
     border: 1px solid #334155;
+    font-size: 14px;
 }
 
 .stTabs [aria-selected="true"] {
     background: #1e293b;
     border: 1px solid #38bdf8;
+}
+
+.stSlider {
+    background: #111827;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid #334155;
+    margin-bottom: 14px;
 }
 
 .stButton > button {
@@ -82,6 +91,10 @@ h1, h2, h3, p, label, span {
     padding: 14px;
     font-size: 18px;
     font-weight: 700;
+}
+
+.stButton > button:hover {
+    background: #0284c7;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -152,26 +165,46 @@ def load_backtest():
         daily_fee = LAUFENDE_KOSTEN / 252
         portfolio_returns_net = portfolio_returns - daily_fee
 
-        index = (1 + portfolio_returns_net).cumprod() * 100
-        index.iloc[0] = 100
+        portfolio_index = (1 + portfolio_returns_net).cumprod() * 100
+        portfolio_index.iloc[0] = 100
 
-        days = (index.index[-1] - index.index[0]).days
-        cagr = (index.iloc[-1] / index.iloc[0]) ** (365 / days) - 1
+        benchmark_data = yf.download(
+            "^NDX",
+            period="5y",
+            auto_adjust=True,
+            progress=False
+        )
+
+        benchmark_prices = benchmark_data["Close"].dropna()
+        benchmark_index = benchmark_prices / benchmark_prices.iloc[0] * 100
+
+        combined = pd.concat(
+            [portfolio_index, benchmark_index],
+            axis=1,
+            join="inner"
+        )
+
+        combined.columns = ["NextGen Portfolio", "NASDAQ-100"]
+
+        days = (portfolio_index.index[-1] - portfolio_index.index[0]).days
+        cagr = (portfolio_index.iloc[-1] / portfolio_index.iloc[0]) ** (365 / days) - 1
         volatility = portfolio_returns_net.std() * np.sqrt(252)
+        current_share_price = ANTEILSPREIS_START * (portfolio_index.iloc[-1] / 100)
 
-        current_share_price = ANTEILSPREIS_START * (index.iloc[-1] / 100)
-
-        return index, cagr, volatility, current_share_price, available
+        return portfolio_index, combined, cagr, volatility, current_share_price, available
 
     except Exception:
         dates = pd.date_range(end=pd.Timestamp.today(), periods=60, freq="M")
-        values = np.linspace(100, 165, len(dates))
-        index = pd.Series(values, index=dates)
+        portfolio_index = pd.Series(np.linspace(100, 165, len(dates)), index=dates)
+        benchmark_index = pd.Series(np.linspace(100, 145, len(dates)), index=dates)
 
-        return index, 0.105, 0.22, 41.25, list(PORTFOLIO.keys())
+        combined = pd.concat([portfolio_index, benchmark_index], axis=1)
+        combined.columns = ["NextGen Portfolio", "NASDAQ-100"]
+
+        return portfolio_index, combined, 0.105, 0.22, 41.25, list(PORTFOLIO.keys())
 
 
-index, cagr, volatility, current_share_price, available_tickers = load_backtest()
+portfolio_index, comparison_index, cagr, volatility, current_share_price, available_tickers = load_backtest()
 
 df_portfolio = pd.DataFrame({
     "Ticker": list(PORTFOLIO.keys()),
@@ -183,25 +216,25 @@ df_portfolio = pd.DataFrame({
 col1, col2 = st.columns([1, 3])
 
 with col1:
-    st.image("logo.png", width=95)
+    st.image("logo.png", width=90)
 
 with col2:
     st.markdown("""
-    <h1 style="font-size:28px; margin-bottom:4px;">
+    <h1 style="font-size:26px; margin-bottom:4px;">
         NextGen Robotics AI & Tech Fund
     </h1>
     <p class="subtitle">
-        Digitale Fondsplattform · historische Simulation des Musterportfolios
+        Digitale Fondsplattform · historischer Backtest des Musterportfolios
     </p>
     """, unsafe_allow_html=True)
 
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🏠 Übersicht",
-    "🚀 Investieren",
-    "💼 Dashboard",
-    "📊 Portfolio"
+    "Übersicht",
+    "Investieren",
+    "Depot",
+    "Portfolio"
 ])
 
 
@@ -221,7 +254,7 @@ with tab1:
     with c2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Simulierter Anteilspreis</div>
+            <div class="metric-label">Wert eines Fondsanteils heute</div>
             <div class="metric-value">{euro(current_share_price)}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -230,8 +263,8 @@ with tab1:
     fig.patch.set_facecolor("#111827")
     ax.set_facecolor("#111827")
 
-    ax.plot(index.index, index.values, color="#38bdf8", linewidth=2.5)
-    ax.fill_between(index.index, index.values, 100, color="#38bdf8", alpha=0.18)
+    ax.plot(portfolio_index.index, portfolio_index.values, color="#38bdf8", linewidth=2.5)
+    ax.fill_between(portfolio_index.index, portfolio_index.values, 100, color="#38bdf8", alpha=0.18)
 
     ax.set_title("Backtest des Musterportfolios", color="white")
     ax.set_ylabel("Indexiert auf 100", color="white")
@@ -249,17 +282,24 @@ with tab1:
 with tab2:
     st.markdown("## Fondsanteile kaufen")
 
-    betrag = st.number_input(
+    betrag = st.slider(
         "Investitionsbetrag (€)",
         min_value=100,
-        max_value=50000,
-        value=1000,
+        max_value=10000,
+        value=500,
         step=100
     )
 
     ausgabeaufschlag = betrag * AUSGABEAUFSCHLAG
     nettobetrag = betrag - ausgabeaufschlag
     anteile = nettobetrag / current_share_price
+
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Investitionsbetrag</div>
+        <div class="metric-value">{euro(betrag)}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown(f"""
     <div class="metric-card">
@@ -289,7 +329,7 @@ with tab2:
 
 
 with tab3:
-    st.markdown("## Mein Dashboard")
+    st.markdown("## Mein Depot")
 
     investiert = 5000
     anteile_demo = investiert / ANTEILSPREIS_START
@@ -333,25 +373,33 @@ with tab3:
         </div>
         """, unsafe_allow_html=True)
 
-    scaled_values = index / 100 * investiert
+    st.markdown("## Vergleich mit NASDAQ-100")
+
+    scaled_nextgen = comparison_index["NextGen Portfolio"] / 100 * investiert
+    scaled_nasdaq = comparison_index["NASDAQ-100"] / 100 * investiert
 
     fig2, ax2 = plt.subplots(figsize=(7, 4))
     fig2.patch.set_facecolor("#111827")
     ax2.set_facecolor("#111827")
 
-    ax2.plot(scaled_values.index, scaled_values.values, color="#38bdf8", linewidth=2.5)
-    ax2.fill_between(scaled_values.index, scaled_values.values, investiert, color="#38bdf8", alpha=0.18)
+    ax2.plot(scaled_nextgen.index, scaled_nextgen.values, color="#38bdf8", linewidth=2.5, label="NextGen Portfolio")
+    ax2.plot(scaled_nasdaq.index, scaled_nasdaq.values, color="#94a3b8", linewidth=2.2, label="NASDAQ-100")
 
-    ax2.set_title("Simulierte Depotentwicklung", color="white")
+    ax2.set_title("Depotentwicklung im Vergleich", color="white")
     ax2.set_ylabel("Depotwert (€)", color="white")
     ax2.tick_params(colors="white", labelsize=8)
     ax2.grid(alpha=0.18)
+    ax2.legend(loc="upper left")
 
     ax2.get_yaxis().set_major_formatter(
         plt.FuncFormatter(lambda x, loc: f"{int(x):,} €".replace(",", "."))
     )
 
     st.pyplot(fig2)
+
+    st.caption(
+        "Vergleich auf Basis historischer Kursdaten. Beide Linien sind auf denselben Startbetrag indexiert."
+    )
 
 
 with tab4:
@@ -364,7 +412,7 @@ with tab4:
     </div>
     """, unsafe_allow_html=True)
 
-    fig3, ax3 = plt.subplots(figsize=(7, 6))
+    fig3, ax3 = plt.subplots(figsize=(7, 5.5))
     fig3.patch.set_facecolor("#111827")
     ax3.set_facecolor("#111827")
 
@@ -381,4 +429,12 @@ with tab4:
 
     st.pyplot(fig3)
 
-    st.dataframe(df_portfolio, use_container_width=True)
+    st.markdown("## Größte Positionen")
+
+    for _, row in df_portfolio.head(10).iterrows():
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">{row["Ticker"]}</div>
+            <div class="metric-value" style="font-size:23px;">{row["Gewichtung"]:.1f} %</div>
+        </div>
+        """, unsafe_allow_html=True)
