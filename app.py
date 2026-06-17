@@ -42,7 +42,7 @@ h1, h2, h3, p, label, span {
     margin: 16px 0 20px 0;
 }
 
-.metric-card {
+.metric-card, .factsheet-card {
     background: #111827;
     padding: 17px;
     border-radius: 16px;
@@ -61,20 +61,12 @@ h1, h2, h3, p, label, span {
     font-weight: 800;
 }
 
-.factsheet-card {
-    background: #111827;
-    padding: 16px;
-    border-radius: 14px;
-    border: 1px solid #334155;
-    margin-bottom: 10px;
-}
-
 .stTabs [data-baseweb="tab"] {
     background: #111827;
     border-radius: 12px;
-    padding: 9px 11px;
+    padding: 9px 10px;
     border: 1px solid #334155;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .stTabs [aria-selected="true"] {
@@ -100,40 +92,16 @@ h1, h2, h3, p, label, span {
     font-size: 18px;
     font-weight: 700;
 }
-
-.stButton > button:hover {
-    background: #0284c7;
-}
 </style>
 """, unsafe_allow_html=True)
 
 
 DEFAULT_PORTFOLIO = {
-    "NVDA": 9.5,
-    "MSFT": 10.0,
-    "AMZN": 8.0,
-    "GOOGL": 8.0,
-    "META": 7.0,
-    "TSM": 7.0,
-    "AVGO": 6.0,
-    "AMD": 5.0,
-    "ASML": 5.0,
-    "PLTR": 5.0,
-    "TSLA": 4.0,
-    "NOW": 4.0,
-    "CRWD": 3.0,
-    "ISRG": 3.0,
-    "CRM": 2.0,
-    "SNOW": 2.0,
-    "SYM": 2.0,
-    "TER": 1.0,
-    "ROK": 1.0,
-    "QCOM": 1.0,
-    "AAPL": 1.0,
-    "6954.T": 1.0,
-    "PATH": 1.0,
-    "KGX.DE": 0.5,
-    "INTC": 0.5
+    "MSFT": 10, "NVDA": 9.5, "AMZN": 8, "GOOGL": 8, "META": 7,
+    "TSM": 7, "AVGO": 6, "AMD": 5, "ASML": 5, "PLTR": 5,
+    "TSLA": 4, "NOW": 4, "CRWD": 3, "ISRG": 3, "CRM": 2,
+    "SNOW": 2, "SYM": 2, "TER": 1, "ROK": 1, "QCOM": 1,
+    "AAPL": 1, "6954.T": 1, "PATH": 1, "KGX.DE": 0.5, "INTC": 0.5
 }
 
 ANTEILSPREIS_START = 25.00
@@ -162,13 +130,7 @@ def load_backtest():
     tickers = list(PORTFOLIO.keys())
 
     try:
-        data = yf.download(
-            tickers,
-            period="5y",
-            auto_adjust=True,
-            progress=False
-        )
-
+        data = yf.download(tickers, period="5y", auto_adjust=True, progress=False)
         prices = data["Close"].dropna(axis=1, how="all")
         returns = prices.pct_change().dropna()
         available = list(returns.columns)
@@ -177,28 +139,16 @@ def load_backtest():
         weights = weights / weights.sum()
 
         portfolio_returns = returns[available].dot(weights)
-
-        daily_fee = LAUFENDE_KOSTEN / 252
-        portfolio_returns_net = portfolio_returns - daily_fee
+        portfolio_returns_net = portfolio_returns - (LAUFENDE_KOSTEN / 252)
 
         portfolio_index = (1 + portfolio_returns_net).cumprod() * 100
         portfolio_index.iloc[0] = 100
 
-        benchmark_data = yf.download(
-            "^NDX",
-            period="5y",
-            auto_adjust=True,
-            progress=False
-        )
-
+        benchmark_data = yf.download("^NDX", period="5y", auto_adjust=True, progress=False)
         benchmark_prices = benchmark_data["Close"].dropna()
         benchmark_index = benchmark_prices / benchmark_prices.iloc[0] * 100
 
-        combined = pd.concat(
-            [portfolio_index, benchmark_index],
-            axis=1,
-            join="inner"
-        )
+        combined = pd.concat([portfolio_index, benchmark_index], axis=1, join="inner")
         combined.columns = ["NextGen Portfolio", "NASDAQ-100"]
 
         days = (portfolio_index.index[-1] - portfolio_index.index[0]).days
@@ -211,10 +161,8 @@ def load_backtest():
         dates = pd.date_range(end=pd.Timestamp.today(), periods=60, freq="ME")
         portfolio_index = pd.Series(np.linspace(100, 165, len(dates)), index=dates)
         benchmark_index = pd.Series(np.linspace(100, 145, len(dates)), index=dates)
-
         combined = pd.concat([portfolio_index, benchmark_index], axis=1)
         combined.columns = ["NextGen Portfolio", "NASDAQ-100"]
-
         return portfolio_index, combined, 0.105, 41.25
 
 
@@ -251,8 +199,9 @@ with col2:
 
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "Übersicht",
+    "Sparplan",
     "Investieren",
     "Depot",
     "Portfolio",
@@ -284,15 +233,12 @@ with tab1:
     fig, ax = plt.subplots(figsize=(7, 4))
     fig.patch.set_facecolor("#111827")
     ax.set_facecolor("#111827")
-
     ax.plot(portfolio_index.index, portfolio_index.values, color="#38bdf8", linewidth=2.5)
     ax.fill_between(portfolio_index.index, portfolio_index.values, 100, color="#38bdf8", alpha=0.18)
-
     ax.set_title("Backtest des Musterportfolios", color="white")
     ax.set_ylabel("Indexiert auf 100", color="white")
     ax.tick_params(colors="white", labelsize=8)
     ax.grid(alpha=0.18)
-
     st.pyplot(fig)
 
     st.caption(
@@ -302,6 +248,102 @@ with tab1:
 
 
 with tab2:
+    st.markdown("## Sparplan-Rechner")
+
+    monatlicher_betrag = st.slider(
+        "Monatliche Sparrate (€)",
+        min_value=10,
+        max_value=1000,
+        value=50,
+        step=10
+    )
+
+    jahre = st.slider(
+        "Anlagezeitraum (Jahre)",
+        min_value=1,
+        max_value=40,
+        value=20,
+        step=1
+    )
+
+    r_annual = cagr
+    months = jahre * 12
+    r_monthly = r_annual / 12
+
+    total_invested = monatlicher_betrag * months
+    total_value = 0
+    values_history = [0]
+    invested_history = [0]
+
+    for m in range(1, months + 1):
+        total_value = (total_value + monatlicher_betrag) * (1 + r_monthly)
+
+        if m % 12 == 0:
+            values_history.append(total_value)
+            invested_history.append(monatlicher_betrag * m)
+
+    profit = total_value - total_invested
+    years_axis = list(range(len(values_history)))
+
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Berechnungsbasis</div>
+        <div class="metric-value" style="font-size:22px;">{cagr * 100:.2f} % p.a.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Endwert</div>
+            <div class="metric-value">{euro(total_value)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Einzahlungen</div>
+            <div class="metric-value">{euro(total_invested)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Wertzuwachs</div>
+        <div class="metric-value">{euro(profit)}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    fig_sp, ax_sp = plt.subplots(figsize=(7, 4))
+    fig_sp.patch.set_facecolor("#111827")
+    ax_sp.set_facecolor("#111827")
+
+    ax_sp.fill_between(years_axis, invested_history, color="#64748b", alpha=0.85, label="Einzahlungen")
+    ax_sp.fill_between(years_axis, invested_history, values_history, color="#38bdf8", alpha=0.75, label="Wertzuwachs")
+
+    ax_sp.set_title("Sparplan-Projektion", color="white")
+    ax_sp.set_xlabel("Jahre", color="white")
+    ax_sp.set_ylabel("Betrag (€)", color="white")
+    ax_sp.tick_params(colors="white", labelsize=8)
+    ax_sp.grid(alpha=0.18)
+    ax_sp.legend(loc="upper left")
+
+    ax_sp.get_yaxis().set_major_formatter(
+        plt.FuncFormatter(lambda x, loc: f"{int(x):,} €".replace(",", "."))
+    )
+
+    st.pyplot(fig_sp)
+
+    st.caption(
+        "Der Sparplan nutzt die historische Durchschnittsrendite des Musterportfolios aus dem Backtest. "
+        "Dies ist keine Prognose und keine Garantie."
+    )
+
+
+with tab3:
     st.markdown("## Fondsanteile kaufen")
 
     betrag = st.slider(
@@ -321,23 +363,17 @@ with tab2:
         <div class="metric-label">Investitionsbetrag</div>
         <div class="metric-value">{euro(betrag)}</div>
     </div>
-    """, unsafe_allow_html=True)
 
-    st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Ausgabeaufschlag 4,50 %</div>
         <div class="metric-value">{euro(ausgabeaufschlag)}</div>
     </div>
-    """, unsafe_allow_html=True)
 
-    st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Investierter Nettobetrag</div>
         <div class="metric-value">{euro(nettobetrag)}</div>
     </div>
-    """, unsafe_allow_html=True)
 
-    st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Fondsanteile</div>
         <div class="metric-value">{anteile:.2f}</div>
@@ -352,16 +388,12 @@ with tab2:
     st.caption("Demo-Modus: Es findet keine echte Orderausführung statt.")
 
 
-with tab3:
+with tab4:
     st.markdown("## Mein Depot")
 
     depotwert = st.session_state.anteile * current_share_price
     gewinn = depotwert - st.session_state.investiert
-
-    if st.session_state.investiert > 0:
-        performance = gewinn / st.session_state.investiert * 100
-    else:
-        performance = 0
+    performance = gewinn / st.session_state.investiert * 100 if st.session_state.investiert > 0 else 0
 
     c1, c2 = st.columns(2)
 
@@ -401,10 +433,7 @@ with tab3:
 
     st.markdown("## Vergleich mit NASDAQ-100")
 
-    if st.session_state.investiert > 0:
-        startbetrag = st.session_state.investiert
-    else:
-        startbetrag = 100
+    startbetrag = st.session_state.investiert if st.session_state.investiert > 0 else 100
 
     scaled_nextgen = comparison_index["NextGen Portfolio"] / 100 * startbetrag
     scaled_nasdaq = comparison_index["NASDAQ-100"] / 100 * startbetrag
@@ -433,12 +462,8 @@ with tab3:
         st.session_state.anteile = 0.0
         st.rerun()
 
-    st.caption(
-        "Vergleich auf Basis historischer Kursdaten. Beide Linien sind auf denselben Startbetrag indexiert."
-    )
 
-
-with tab4:
+with tab5:
     st.markdown("## Portfolio")
 
     st.markdown(f"""
@@ -476,54 +501,27 @@ with tab4:
         """, unsafe_allow_html=True)
 
 
-with tab5:
+with tab6:
     st.markdown("## Digitales Factsheet")
 
-    st.markdown("""
-    <div class="factsheet-card">
-        <div class="metric-label">Fondsname</div>
-        <div class="metric-value" style="font-size:22px;">NextGen Robotics AI & Tech Fund</div>
-    </div>
+    facts = [
+        ("Fondsname", "NextGen Robotics AI & Tech Fund"),
+        ("Fondswährung", "Euro (EUR)"),
+        ("Ertragsverwendung", "Thesaurierend"),
+        ("Risikoklasse", "5 / 7"),
+        ("Startpreis je Anteil", "25,00 €"),
+        ("Laufende Kosten Retail", "1,98 % p.a."),
+        ("Ausgabeaufschlag Retail", "4,50 %"),
+        ("Anlagefokus", "KI, Robotik, Halbleiter, Cloud")
+    ]
 
-    <div class="factsheet-card">
-        <div class="metric-label">Fondswährung</div>
-        <div class="metric-value" style="font-size:22px;">Euro (EUR)</div>
-    </div>
-
-    <div class="factsheet-card">
-        <div class="metric-label">Ertragsverwendung</div>
-        <div class="metric-value" style="font-size:22px;">Thesaurierend</div>
-    </div>
-
-    <div class="factsheet-card">
-        <div class="metric-label">Risikoklasse</div>
-        <div class="metric-value" style="font-size:22px;">5 / 7</div>
-    </div>
-
-    <div class="factsheet-card">
-        <div class="metric-label">Startpreis je Anteil</div>
-        <div class="metric-value" style="font-size:22px;">25,00 €</div>
-    </div>
-
-    <div class="factsheet-card">
-        <div class="metric-label">Laufende Kosten Retail</div>
-        <div class="metric-value" style="font-size:22px;">1,98 % p.a.</div>
-    </div>
-
-    <div class="factsheet-card">
-        <div class="metric-label">Ausgabeaufschlag Retail</div>
-        <div class="metric-value" style="font-size:22px;">4,50 %</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("## Anlagefokus")
-
-    st.markdown("""
-    Der Fonds konzentriert sich auf Unternehmen aus den Bereichen 
-    **Künstliche Intelligenz, Robotik, Halbleiter, Cloud-Infrastruktur und Automatisierung**.
-
-    Ziel ist eine langfristige Beteiligung an Unternehmen, die zentrale technologische Entwicklungen der Zukunft mitgestalten.
-    """)
+    for label, value in facts:
+        st.markdown(f"""
+        <div class="factsheet-card">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value" style="font-size:22px;">{value}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.caption(
         "Dieses digitale Factsheet dient ausschließlich der Präsentation. "
