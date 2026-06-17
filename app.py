@@ -61,6 +61,14 @@ h1, h2, h3, p, label, span {
     font-weight: 800;
 }
 
+.factsheet-card {
+    background: #111827;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid #334155;
+    margin-bottom: 10px;
+}
+
 .stTabs [data-baseweb="tab"] {
     background: #111827;
     border-radius: 12px;
@@ -100,7 +108,7 @@ h1, h2, h3, p, label, span {
 """, unsafe_allow_html=True)
 
 
-PORTFOLIO = {
+DEFAULT_PORTFOLIO = {
     "NVDA": 9.5,
     "MSFT": 10.0,
     "AMZN": 8.0,
@@ -137,6 +145,18 @@ def euro(value):
     return f"{value:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+@st.cache_data
+def load_portfolio():
+    try:
+        df = pd.read_csv("fonds.csv")
+        return dict(zip(df["Symbol"], df["Allocation"]))
+    except Exception:
+        return DEFAULT_PORTFOLIO
+
+
+PORTFOLIO = load_portfolio()
+
+
 @st.cache_data(ttl=3600)
 def load_backtest():
     tickers = list(PORTFOLIO.keys())
@@ -151,13 +171,9 @@ def load_backtest():
 
         prices = data["Close"].dropna(axis=1, how="all")
         returns = prices.pct_change().dropna()
-
         available = list(returns.columns)
 
-        weights = pd.Series({
-            ticker: PORTFOLIO[ticker] for ticker in available
-        })
-
+        weights = pd.Series({ticker: PORTFOLIO[ticker] for ticker in available})
         weights = weights / weights.sum()
 
         portfolio_returns = returns[available].dot(weights)
@@ -183,33 +199,38 @@ def load_backtest():
             axis=1,
             join="inner"
         )
-
         combined.columns = ["NextGen Portfolio", "NASDAQ-100"]
 
         days = (portfolio_index.index[-1] - portfolio_index.index[0]).days
         cagr = (portfolio_index.iloc[-1] / portfolio_index.iloc[0]) ** (365 / days) - 1
-        volatility = portfolio_returns_net.std() * np.sqrt(252)
         current_share_price = ANTEILSPREIS_START * (portfolio_index.iloc[-1] / 100)
 
-        return portfolio_index, combined, cagr, volatility, current_share_price, available
+        return portfolio_index, combined, cagr, current_share_price
 
     except Exception:
-        dates = pd.date_range(end=pd.Timestamp.today(), periods=60, freq="M")
+        dates = pd.date_range(end=pd.Timestamp.today(), periods=60, freq="ME")
         portfolio_index = pd.Series(np.linspace(100, 165, len(dates)), index=dates)
         benchmark_index = pd.Series(np.linspace(100, 145, len(dates)), index=dates)
 
         combined = pd.concat([portfolio_index, benchmark_index], axis=1)
         combined.columns = ["NextGen Portfolio", "NASDAQ-100"]
 
-        return portfolio_index, combined, 0.105, 0.22, 41.25, list(PORTFOLIO.keys())
+        return portfolio_index, combined, 0.105, 41.25
 
 
-portfolio_index, comparison_index, cagr, volatility, current_share_price, available_tickers = load_backtest()
+portfolio_index, comparison_index, cagr, current_share_price = load_backtest()
 
 df_portfolio = pd.DataFrame({
     "Ticker": list(PORTFOLIO.keys()),
     "Gewichtung": list(PORTFOLIO.values())
 }).sort_values("Gewichtung", ascending=False)
+
+
+if "investiert" not in st.session_state:
+    st.session_state.investiert = 0.0
+
+if "anteile" not in st.session_state:
+    st.session_state.anteile = 0.0
 
 
 # Header
@@ -230,11 +251,12 @@ with col2:
 
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Übersicht",
     "Investieren",
     "Depot",
-    "Portfolio"
+    "Portfolio",
+    "Factsheet"
 ])
 
 
@@ -323,6 +345,8 @@ with tab2:
     """, unsafe_allow_html=True)
 
     if st.button("Jetzt investieren"):
+        st.session_state.investiert += nettobetrag
+        st.session_state.anteile += anteile
         st.success(f"Order erfasst: {euro(nettobetrag)} wurden in {anteile:.2f} Fondsanteile investiert.")
 
     st.caption("Demo-Modus: Es findet keine echte Orderausführung statt.")
@@ -331,11 +355,13 @@ with tab2:
 with tab3:
     st.markdown("## Mein Depot")
 
-    investiert = 5000
-    anteile_demo = investiert / ANTEILSPREIS_START
-    depotwert = anteile_demo * current_share_price
-    gewinn = depotwert - investiert
-    performance = gewinn / investiert * 100
+    depotwert = st.session_state.anteile * current_share_price
+    gewinn = depotwert - st.session_state.investiert
+
+    if st.session_state.investiert > 0:
+        performance = gewinn / st.session_state.investiert * 100
+    else:
+        performance = 0
 
     c1, c2 = st.columns(2)
 
@@ -361,22 +387,27 @@ with tab3:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Investiert</div>
-            <div class="metric-value">{euro(investiert)}</div>
+            <div class="metric-value">{euro(st.session_state.investiert)}</div>
         </div>
         """, unsafe_allow_html=True)
 
     with c4:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Wertzuwachs</div>
-            <div class="metric-value">{euro(gewinn)}</div>
+            <div class="metric-label">Fondsanteile</div>
+            <div class="metric-value">{st.session_state.anteile:.2f}</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("## Vergleich mit NASDAQ-100")
 
-    scaled_nextgen = comparison_index["NextGen Portfolio"] / 100 * investiert
-    scaled_nasdaq = comparison_index["NASDAQ-100"] / 100 * investiert
+    if st.session_state.investiert > 0:
+        startbetrag = st.session_state.investiert
+    else:
+        startbetrag = 100
+
+    scaled_nextgen = comparison_index["NextGen Portfolio"] / 100 * startbetrag
+    scaled_nasdaq = comparison_index["NASDAQ-100"] / 100 * startbetrag
 
     fig2, ax2 = plt.subplots(figsize=(7, 4))
     fig2.patch.set_facecolor("#111827")
@@ -396,6 +427,11 @@ with tab3:
     )
 
     st.pyplot(fig2)
+
+    if st.button("Depot zurücksetzen"):
+        st.session_state.investiert = 0.0
+        st.session_state.anteile = 0.0
+        st.rerun()
 
     st.caption(
         "Vergleich auf Basis historischer Kursdaten. Beide Linien sind auf denselben Startbetrag indexiert."
@@ -438,3 +474,58 @@ with tab4:
             <div class="metric-value" style="font-size:23px;">{row["Gewichtung"]:.1f} %</div>
         </div>
         """, unsafe_allow_html=True)
+
+
+with tab5:
+    st.markdown("## Digitales Factsheet")
+
+    st.markdown("""
+    <div class="factsheet-card">
+        <div class="metric-label">Fondsname</div>
+        <div class="metric-value" style="font-size:22px;">NextGen Robotics AI & Tech Fund</div>
+    </div>
+
+    <div class="factsheet-card">
+        <div class="metric-label">Fondswährung</div>
+        <div class="metric-value" style="font-size:22px;">Euro (EUR)</div>
+    </div>
+
+    <div class="factsheet-card">
+        <div class="metric-label">Ertragsverwendung</div>
+        <div class="metric-value" style="font-size:22px;">Thesaurierend</div>
+    </div>
+
+    <div class="factsheet-card">
+        <div class="metric-label">Risikoklasse</div>
+        <div class="metric-value" style="font-size:22px;">5 / 7</div>
+    </div>
+
+    <div class="factsheet-card">
+        <div class="metric-label">Startpreis je Anteil</div>
+        <div class="metric-value" style="font-size:22px;">25,00 €</div>
+    </div>
+
+    <div class="factsheet-card">
+        <div class="metric-label">Laufende Kosten Retail</div>
+        <div class="metric-value" style="font-size:22px;">1,98 % p.a.</div>
+    </div>
+
+    <div class="factsheet-card">
+        <div class="metric-label">Ausgabeaufschlag Retail</div>
+        <div class="metric-value" style="font-size:22px;">4,50 %</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("## Anlagefokus")
+
+    st.markdown("""
+    Der Fonds konzentriert sich auf Unternehmen aus den Bereichen 
+    **Künstliche Intelligenz, Robotik, Halbleiter, Cloud-Infrastruktur und Automatisierung**.
+
+    Ziel ist eine langfristige Beteiligung an Unternehmen, die zentrale technologische Entwicklungen der Zukunft mitgestalten.
+    """)
+
+    st.caption(
+        "Dieses digitale Factsheet dient ausschließlich der Präsentation. "
+        "Es stellt keine Anlageberatung und keine echte Kaufempfehlung dar."
+    )
