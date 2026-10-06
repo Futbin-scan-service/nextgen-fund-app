@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Vantage Futbin Scanner",
+  "version": "1.5.2",
+  "description": "Stable scanner with tab-based link collection and Python license.py compatible validation.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://*.googleusercontent.com/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*",
+    "https://www.futbin.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Vantage Futbin Scanner"
+  }
+}

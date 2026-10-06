@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vantage Futbin Scanner</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">VANTAGE</div>
+      <div class="buildBadge">v1.4.5 · Python-License-Port</div>
+
+      <section class="licenseBox">
+        <div class="sectionTitle">Lizenz</div>
+        <label>Lizenzschlüssel
+          <input id="license_key" type="text" placeholder="z. B. DS-TEST-001" autocomplete="off">
+        </label>
+        <div class="licenseActions">
+          <button id="activateLicenseBtn" class="smallBtn">Aktivieren</button>
+          <button id="checkLicenseBtn" class="smallBtn secondary">Prüfen</button>
+          <button id="clearLicenseBtn" class="smallBtn danger">Cache löschen</button>
+        </div>
+        <div id="licenseStatus" class="licenseStatus">Keine Lizenz aktiviert.</div>
+        <div id="licenseMeta" class="licenseMeta"></div>
+      </section>
+
+      <label>Plattform
+        <select id="platform">
+          <option value="ps">PlayStation / Xbox</option>
+          <option value="pc">PC</option>
+        </select>
+      </label>
+      <label>Min Preis <input id="price_min" type="number" value="20000"></label>
+      <label>Max Preis <input id="price_max" type="number" value="60000"></label>
+      <label>Intervall (Minuten) <input id="interval_min" type="number" value="3"></label>
+      <label>Seiten <input id="pages_to_scan" type="number" value="12"></label>
+      <label>Parallelität <input id="concurrency" type="number" min="1" max="6" value="3"></label>
+      <details class="advanced"><summary>Stabilität</summary>
+        <label>Timeout pro Seite (Sek.) <input id="page_timeout_sec" type="number" min="8" max="45" value="18"></label>
+        <label>Retries pro Seite <input id="retry_count" type="number" min="0" max="4" value="2"></label>
+      </details>
+
+      <div class="progressWrap">
+        <div id="status">Bereit</div>
+        <progress id="progress" value="0" max="100"></progress>
+      </div>
+
+      <div class="stats" id="stats">
+        <div><span>Deals</span><strong id="statDeals">0</strong></div>
+        <div><span>Geprüft</span><strong id="statProcessed">0</strong></div>
+        <div><span>Links</span><strong id="statTotal">0</strong></div>
+        <div><span>Fehler</span><strong id="statErrors">0</strong></div>
+        <div><span>Übersprungen</span><strong id="statSkipped">0</strong></div>
+      </div>
+
+      <div class="actions">
+        <button id="startBtn">Session starten</button>
+        <button id="stopBtn" class="secondary">Stoppen</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="headlineRow">
+        <div class="headline">LIVE DEALS</div>
+        <div class="topActions"><button id="clearDealsBtn" class="ghost">Deals leeren</button><button id="refreshBtn" class="ghost">Aktualisieren</button></div>
+      </div>
+
+      <section id="licenseGate" class="licenseGate">
+        <div>
+          <div class="licenseGateTitle">Lizenz aktivieren</div>
+          <div class="licenseGateText">Gib deinen Google-Sheets-Lizenzkey ein. Ohne gültige Lizenz startet der Scanner nicht.</div>
+        </div>
+        <div class="licenseGateForm">
+          <input id="license_key_main" type="text" placeholder="Lizenzkey eingeben" autocomplete="off">
+          <button id="activateLicenseBtnMain" class="smallBtn">Aktivieren</button>
+        </div>
+      </section>
+
+      <section class="diagnostics">
+        <div class="diagHeader">Diagnose</div>
+        <div id="diagnosticsText" class="diagnosticsText">Noch keine Diagnose.</div>
+      </section>
+
+      <div id="deals" class="deals"></div>
+    </main>
+  </div>
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>
