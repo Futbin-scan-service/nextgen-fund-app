@@ -78,6 +78,7 @@ async function loadState() {
   qs('#concurrency').value = config.concurrency ?? 3;
   if (qs('#page_timeout_sec')) qs('#page_timeout_sec').value = config.page_timeout_sec ?? 18;
   if (qs('#retry_count')) qs('#retry_count').value = config.retry_count ?? 2;
+  if (qs('#special_filter')) qs('#special_filter').value = config.special_filter ?? 'version=all_specials';
 
   qs('#status').textContent = runtimeState.status || 'Bereit';
   qs('#progress').value = Math.round((runtimeState.progress || 0) * 100);
@@ -116,7 +117,8 @@ function currentConfig() {
     pages_to_scan: Number(qs('#pages_to_scan').value),
     concurrency: Number(qs('#concurrency').value),
     page_timeout_sec: Number(qs('#page_timeout_sec')?.value || 18),
-    retry_count: Number(qs('#retry_count')?.value || 2)
+    retry_count: Number(qs('#retry_count')?.value || 2),
+    special_filter: qs('#special_filter')?.value ?? 'version=all_specials'
   };
 }
 
@@ -144,21 +146,17 @@ function renderDeals(deals) {
     return;
   }
   root.innerHTML = deals.map(deal => {
-    const trendClass = deal.trend > 0 ? 'trendUp' : deal.trend < 0 ? 'trendDown' : 'trendFlat';
-    const trendSymbol = deal.trend > 0 ? '▲' : deal.trend < 0 ? '▼' : '•';
-    const salesPerHour = Number.isFinite(Number(deal.sales_per_hour)) ? Number(deal.sales_per_hour).toFixed(1) : '—';
     return `
       <section class="card">
-        <div class="cardTitle"><span>${escapeHtml((deal.player || 'Unknown').toUpperCase())}</span><span class="${trendClass}">${trendSymbol}</span></div>
+        <div class="cardTitle"><span>${escapeHtml((deal.player || 'Unknown').toUpperCase())}</span></div>
         <div class="row2">
           <div><div class="metricLabel">BUY</div><div class="metricValue">${fmtInt(deal.first || 0)}</div></div>
-          <div><div class="metricLabel">SELL</div><div class="metricValue">${fmtInt(deal.target_sell || 0)}</div></div>
+          <div><div class="metricLabel">P5</div><div class="metricValue">${fmtInt(deal.last || 0)}</div></div>
         </div>
-        <div class="profit">+ ${fmtInt(deal.profit || 0)} (${fmtPct(deal.undervalue_pct || 0)})</div>
-        <div class="meta"><div>MARKTPR. P5</div><div>${fmtInt(deal.last || 0)}</div></div>
-        <div class="meta"><div>SALES / H</div><div>${salesPerHour}</div></div>
-        <div class="meta"><div>HIT RATIO</div><div>${deal.hit_count || 0} / ${deal.hits_needed || 0}</div></div>
-        <a href="${deal.url}" target="_blank" rel="noreferrer">Futbin öffnen</a>
+        <div class="profit">DIFF ${fmtInt(deal.diff || 0)} (min. ${fmtInt(deal.min_diff || 0)})</div>
+        <div class="meta"><div>NETTO BEI P5</div><div>${fmtInt(deal.profit || 0)}</div></div>
+        <div class="meta"><div>PREISE</div><div>${(deal.visible_prices || []).map(fmtInt).join(' · ') || '—'}</div></div>
+        <a href="${escapeHtml(deal.url || '')}" target="_blank" rel="noreferrer">Futbin öffnen</a>
       </section>
     `;
   }).join('');

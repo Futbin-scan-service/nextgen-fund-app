@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Vantage Futbin Scanner",
-  "version": "1.5.2",
-  "description": "Stable scanner with tab-based link collection and Python license.py compatible validation.",
+  "version": "1.6.0",
+  "description": "Futbin Diff-Scanner f\u00fcr Special Cards.",
   "permissions": [
     "storage",
     "tabs",
@@ -16,7 +16,8 @@
     "https://www.futbin.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "action": {
     "default_title": "Vantage Futbin Scanner"
