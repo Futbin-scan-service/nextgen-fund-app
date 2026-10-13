@@ -42,9 +42,6 @@ button.secondary { background: transparent; border: 1px solid var(--red); color:
   background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
 }
 .cardTitle { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-weight: 900; margin-bottom: 12px; }
-.trendUp { color: var(--green); }
-.trendDown { color: var(--red); }
-.trendFlat { color: #64748b; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .metricLabel { font-size: 11px; color: var(--gold); font-weight: 800; }
 .metricValue { font-size: 24px; font-weight: 900; }

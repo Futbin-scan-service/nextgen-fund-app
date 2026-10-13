@@ -1,286 +1,8 @@
-const EA_TAX_PCT = 0.05;
-const SALES_N_BASE = 30;
-const SALES_N_MID = 60;
-const SALES_N_MAX = 90;
-const MIN_SALES_REQUIRED = 10;
-const VALUE_UNDERVALUE_PCT = 0.02;
-const VALUE_UNDERVALUE_PCT_PC = 0.025;
-const MIN_SALES_PER_HOUR_PC = 5.0;
-const MIN_NET_PROFIT_PCT = 0.04;
-const MAX_NET_PROFIT_CAP_PCT = 0.05;
-
-function buildPlayersUrl(cfg) {
-  const plat = (cfg.platform || 'ps').toLowerCase() === 'pc' ? 'pc' : 'ps';
-  const priceKey = plat === 'pc' ? 'pc_price' : 'ps_price';
-  return `https://www.futbin.com/players?${priceKey}=${cfg.price_min}-${cfg.price_max}&platform=${plat}&eUnt=1`;
-}
-
-function playerToSalesUrl(playerUrl, platform) {
-  const u = new URL(playerUrl.split('#')[0]);
-  u.pathname = u.pathname.replace('/player/', '/sales/');
-  u.searchParams.set('platform', (platform || 'ps').toLowerCase() === 'pc' ? 'pc' : 'ps');
-  return u.toString();
-}
-
-function clamp(x, lo, hi) { return x < lo ? lo : x > hi ? hi : x; }
-function ceilToStep(value, step) { return Math.ceil(value / step) * step; }
-function floorToStep(value, step) { return Math.floor(value / step) * step; }
-function stepForPrice(price) { return price >= 50000 ? 500 : 250; }
-
-function minDiffRequired(firstPrice) {
-  let raw;
-  if (firstPrice < 50000) raw = firstPrice * 0.06 - 250;
-  else if (firstPrice < 75000) raw = firstPrice * 0.055 - 250;
-  else raw = firstPrice * 0.05;
-  const step = firstPrice < 50000 ? 250 : 500;
-  return Math.max(step, Math.round(raw / step) * step);
-}
-
-function targetSellForMinNetProfit(buy, minNetProfitPct = MIN_NET_PROFIT_PCT) {
-  const step = stepForPrice(buy);
-  const raw = buy * (1 + minNetProfitPct) / (1 - EA_TAX_PCT);
-  return ceilToStep(raw, step);
-}
-
-function targetSellForMaxNetProfit(buy, capPct = MAX_NET_PROFIT_CAP_PCT) {
-  const step = stepForPrice(buy);
-  const maxSell = (buy + buy * capPct) / (1 - EA_TAX_PCT);
-  return floorToStep(maxSell, step);
-}
-
-function medianInt(values) {
-  const vals = values.filter(v => Number.isFinite(v) && v > 0).sort((a, b) => a - b);
-  if (!vals.length) return 0;
-  const mid = Math.floor(vals.length / 2);
-  return vals.length % 2 ? vals[mid] : Math.floor((vals[mid - 1] + vals[mid]) / 2);
-}
-
-function percentileInt(values, p) {
-  const vals = values.filter(v => Number.isFinite(v) && v > 0).sort((a, b) => a - b);
-  if (!vals.length) return 0;
-  const idx = Math.round((vals.length - 1) * clamp(p, 0, 1));
-  return vals[idx];
-}
-
-function recentSlice(valuesNewestFirst) { return valuesNewestFirst.slice(0, 15); }
-function countHits(values, level) { return values.filter(v => v >= level).length; }
-
-function salesSpeedPerHour(rowsNewestFirst, take = 30) {
-  const ages = rowsNewestFirst.slice(0, take).map(x => x.age_min).filter(v => Number.isFinite(v) && v >= 0);
-  if (ages.length < 10) return 0;
-  const newest = Math.min(...ages);
-  const oldest = Math.max(...ages);
-  const spanMin = oldest - newest;
-  if (spanMin <= 0) return 999;
-  return ages.length / (spanMin / 60);
-}
-
-function determineAdaptiveSalesN(diff, buy, median) {
-  if (buy <= 0 || median <= 0) return SALES_N_BASE;
-  const diffPct = diff / buy;
-  const undervaluePct = (median - buy) / median;
-  if (diffPct >= 0.08 || undervaluePct >= 0.06) return SALES_N_MAX;
-  if (diffPct >= 0.05 || undervaluePct >= 0.04) return SALES_N_MID;
-  return SALES_N_BASE;
-}
-
-function trendStateFromSales(pricesNewestFirst) {
-  if (pricesNewestFirst.length < 16) return 0;
-  const recent = pricesNewestFirst.slice(0, 8);
-  const older = pricesNewestFirst.slice(8, 16);
-  const mr = medianInt(recent);
-  const mo = medianInt(older);
-  if (mr <= 0 || mo <= 0) return 0;
-  if (mr > mo * 1.005) return 1;
-  if (mr < mo * 0.995) return -1;
-  return 0;
-}
-
-function dynamicHitsNeeded(probePrice, median) {
-  if (median <= 0 || probePrice <= 0) return 3;
-  const ratio = probePrice / median;
-  if (ratio <= 1.02) return 2;
-  if (ratio <= 1.05) return 3;
-  if (ratio <= 1.08) return 4;
-  return 999;
-}
-
-function baseCapRatio(buy) { return buy < 60000 ? 1.05 : 1.03; }
-function tightCapRatio(buy) { return buy < 60000 ? 1.04 : 1.02; }
-
-function findBestLevel(buy, salesPricesNewestFirst) {
-  const prices = salesPricesNewestFirst;
-  const step = stepForPrice(buy);
-  const minProfitTarget = targetSellForMinNetProfit(buy, MIN_NET_PROFIT_PCT);
-  const med = medianInt(prices);
-  if (med <= 0) return { med, best: minProfitTarget, start: 0 };
-
-  const p60 = percentileInt(prices, 0.60);
-  let start = floorToStep(Math.max(minProfitTarget, p60), step);
-  const p90 = percentileInt(prices, 0.90);
-  const medCap = Math.floor(med * 1.03);
-  let cap = floorToStep(Math.min(p90 || medCap, medCap), step);
-  if (cap < start) cap = start;
-
-  let best = start;
-  for (let probe = start; probe <= cap; probe += step) {
-    const need = dynamicHitsNeeded(probe, med);
-    if (need >= 999) break;
-    const hits = countHits(prices, probe);
-    if (hits >= need + 1) best = probe;
-    else break;
-  }
-  return { med, best, start };
-}
-
-function computeFinalTargetWithQuality({ buy, bestLevel, trend, med, salesPricesNewestFirst, undervaluePct, salesSpeedPerHourValue, platform = 'ps' }) {
-  const step = stepForPrice(buy);
-  const recent = recentSlice(salesPricesNewestFirst);
-  const minProfitTarget = targetSellForMinNetProfit(buy, MIN_NET_PROFIT_PCT);
-  const isPc = (platform || 'ps').toLowerCase() === 'pc';
-
-  let baseTarget = trend > 0 ? bestLevel : trend < 0 ? bestLevel - 2 * step : bestLevel - step;
-  let candidate = Math.max(minProfitTarget, baseTarget);
-
-  let need = dynamicHitsNeeded(candidate, med);
-  let hitsAll = countHits(salesPricesNewestFirst, candidate);
-  let hitsRecent = countHits(recent, candidate);
-
-  let capRatio = baseCapRatio(buy);
-  const weakConf = hitsAll <= need || hitsRecent === 0 || (trend < 0 && hitsRecent <= 1);
-  if (weakConf) capRatio = tightCapRatio(buy);
-
-  const capLevel = med > 0 ? floorToStep(med * capRatio, step) : candidate;
-  candidate = Math.min(candidate, capLevel);
-  candidate = Math.max(minProfitTarget, candidate);
-
-  need = dynamicHitsNeeded(candidate, med);
-  hitsAll = countHits(salesPricesNewestFirst, candidate);
-  hitsRecent = countHits(recent, candidate);
-
-  let extraSteps = 0;
-  const s = Number(salesSpeedPerHourValue || 0);
-  if (isPc) {
-    if (s > 0 && s < 6) extraSteps = Math.max(extraSteps, 1);
-    if (s > 0 && s < 4) extraSteps = Math.max(extraSteps, 2);
-    if (s > 0 && s < 2.5) extraSteps = Math.max(extraSteps, 3);
-  } else {
-    if (s > 0 && s < 10) extraSteps = Math.max(extraSteps, 1);
-    if (s > 0 && s < 6) extraSteps = Math.max(extraSteps, 2);
-    if (s > 0 && s < 4) extraSteps = Math.max(extraSteps, 3);
-    if (s > 0 && s < 2) extraSteps = Math.max(extraSteps, 4);
-  }
-
-  if (hitsAll <= need) extraSteps = Math.max(extraSteps, 2);
-  else if (hitsAll === need + 1) extraSteps = Math.max(extraSteps, 1);
-  if (hitsRecent === 0) extraSteps = Math.max(extraSteps, 2);
-  else if (hitsRecent === 1 && candidate / med > 1.01) extraSteps = Math.max(extraSteps, 1);
-  if (trend < 0) extraSteps = Math.max(extraSteps, 1);
-  if (buy >= 60000 && undervaluePct < 0.03 && hitsRecent <= 1) extraSteps = Math.max(extraSteps, 2);
-
-  let finalTarget = candidate - extraSteps * step;
-  finalTarget = Math.max(minProfitTarget, finalTarget);
-  finalTarget = med > 0 ? Math.min(finalTarget, capLevel) : finalTarget;
-  finalTarget = Math.max(minProfitTarget, finalTarget);
-  return { finalTarget: Math.trunc(finalTarget), undercutSteps: Math.trunc(extraSteps) };
-}
-
-function analysePlayer({ cfg, player, salesRows }) {
-  const { first, last } = player;
-  const diff = last - first;
-  const minDiff = minDiffRequired(first);
-  if (diff < minDiff) return { accepted: false, reason: 'gap_too_small' };
-
-  if (salesRows.length < MIN_SALES_REQUIRED) return { accepted: false, reason: 'not_enough_sales_base' };
-  const basePrices = salesRows.map(x => x.sold).filter(Boolean);
-  const med30 = medianInt(basePrices);
-  if (med30 <= 0) return { accepted: false, reason: 'median_invalid_base' };
-
-  const minUndervalue = (cfg.platform || 'ps').toLowerCase() === 'pc' ? VALUE_UNDERVALUE_PCT_PC : VALUE_UNDERVALUE_PCT;
-  const undervaluePct30 = (med30 - first) / med30;
-  if (undervaluePct30 < minUndervalue) return { accepted: false, reason: 'undervalue_too_low_base' };
-
-  const desiredN = determineAdaptiveSalesN(diff, first, med30);
-  const effectiveRows = salesRows.slice(0, desiredN);
-  if (effectiveRows.length < MIN_SALES_REQUIRED) return { accepted: false, reason: 'not_enough_sales_final' };
-
-  const prices = effectiveRows.map(x => x.sold).filter(Boolean);
-  const med = medianInt(prices);
-  if (med <= 0) return { accepted: false, reason: 'median_invalid_final' };
-
-  const undervaluePct = (med - first) / med;
-  const trend = trendStateFromSales(prices);
-  const speedH = salesSpeedPerHour(effectiveRows, Math.min(60, effectiveRows.length));
-  if ((cfg.platform || 'ps').toLowerCase() === 'pc' && speedH < MIN_SALES_PER_HOUR_PC) {
-    return { accepted: false, reason: 'pc_sales_too_slow' };
-  }
-
-  const recent = recentSlice(prices);
-  if (trend < 0 && countHits(recent, floorToStep(med, stepForPrice(first))) === 0 && undervaluePct < 0.025) {
-    return { accepted: false, reason: 'negative_trend_weak_recent' };
-  }
-
-  const best = findBestLevel(first, prices);
-  let { finalTarget, undercutSteps } = computeFinalTargetWithQuality({
-    buy: first,
-    bestLevel: best.best,
-    trend,
-    med: best.med,
-    salesPricesNewestFirst: prices,
-    undervaluePct,
-    salesSpeedPerHourValue: speedH,
-    platform: cfg.platform
-  });
-
-  const minProfitTarget = targetSellForMinNetProfit(first, MIN_NET_PROFIT_PCT);
-  const capLevel = targetSellForMaxNetProfit(first, MAX_NET_PROFIT_CAP_PCT);
-  if (capLevel > 0) finalTarget = Math.min(finalTarget, capLevel);
-  finalTarget = Math.max(finalTarget, minProfitTarget);
-
-  const needFinal = dynamicHitsNeeded(finalTarget, best.med);
-  if (needFinal >= 999) return { accepted: false, reason: 'target_above_allowed_band' };
-  const hitsFinal = countHits(prices, finalTarget);
-  if (hitsFinal < needFinal) return { accepted: false, reason: 'not_enough_hits_at_target' };
-
-  const profit = Math.round(finalTarget * (1 - EA_TAX_PCT) - first);
-  return {
-    accepted: true,
-    deal: {
-      player: player.player,
-      url: player.url,
-      sales_url: playerToSalesUrl(player.url, cfg.platform),
-      first,
-      target_sell: finalTarget,
-      undervalue_pct: undervaluePct,
-      median_sale: best.med,
-      trend,
-      sales_per_hour: Number(speedH.toFixed(2)),
-      sales_checked: effectiveRows.length,
-      hit_count: hitsFinal,
-      hits_needed: needFinal,
-      undercut_steps: undercutSteps,
-      last,
-      diff,
-      min_diff: minDiff,
-      profit,
-      second: player.second,
-      third: player.third,
-      fourth: player.fourth,
-      visible_prices: player.visiblePrices || [],
-      p5_market: last,
-      gap: diff,
-      gewinn: profit,
-      expected_net_profit: profit,
-      expected_net_profit_pct: first ? profit / first : 0,
-      value_score: Math.round(clamp(undervaluePct / 0.10, 0, 1) * 100)
-    }
-  };
-}
-
+import { buildPlayersUrl, analysePlayer, normalizePlatform, DEFAULT_SPECIAL_FILTER } from './scanner-core.js';
 
 const DASHBOARD_URL = chrome.runtime.getURL('dashboard.html');
 const LICENSE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwLYXP3iHbAuXsKKDQoK3MGPZ8SiXaWfrvyozOI7lCrEIutphYqrMuoxx7ggaMlTZqa/exec';
-const VERSION = '1.5.2-single-foreground-linktab';
+const VERSION = '1.6.0-diff-specials';
 
 const DEFAULT_CFG = {
   price_min: 20000,
@@ -292,7 +14,8 @@ const DEFAULT_CFG = {
   enabled: false,
   page_timeout_sec: 18,
   retry_count: 2,
-  keep_debug_log: true
+  keep_debug_log: true,
+  special_filter: DEFAULT_SPECIAL_FILTER
 };
 
 const DEFAULT_LICENSE_STATE = {
@@ -430,7 +153,8 @@ function normalizeCfg(cfg) {
     price_max: Math.max(0, Number(cfg.price_max || 60000)),
     page_timeout_sec: Math.max(8, Math.min(45, Number(cfg.page_timeout_sec || 18))),
     retry_count: Math.max(0, Math.min(4, Number(cfg.retry_count ?? 2))),
-    keep_debug_log: cfg.keep_debug_log !== false
+    keep_debug_log: cfg.keep_debug_log !== false,
+    special_filter: String(cfg.special_filter ?? DEFAULT_SPECIAL_FILTER).trim()
   };
   if (out.price_max < out.price_min) [out.price_min, out.price_max] = [out.price_max, out.price_min];
   return out;
@@ -761,50 +485,6 @@ async function waitForConditionInTab(tabId, predicate, timeoutMs = 8000, interva
 }
 
 
-function extractPlayerLinksFromHtml(html, pageUrl) {
-  const out = [];
-  const seen = new Set();
-  const re = /href=["']([^"']*\/player\/[^"'#?]+(?:\?[^"'#]*)?)/gi;
-  let m;
-  while ((m = re.exec(String(html || '')))) {
-    try {
-      const abs = new URL(m[1].replaceAll('&amp;', '&'), pageUrl).toString().split('#')[0];
-      if (!seen.has(abs)) { seen.add(abs); out.push(abs); }
-    } catch {}
-  }
-  return out;
-}
-
-async function fetchTextWithTimeout(url, timeoutMs) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'include',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }
-    });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return text;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function collectLinksForPageFast(cfg, pageNo) {
-  const base = buildPlayersUrl(cfg);
-  const url = `${base}&page=${pageNo}`;
-  const timeoutMs = Math.max(8000, Math.min(30000, Number(cfg.page_timeout_sec || 18) * 1000));
-  const html = await fetchTextWithTimeout(url, timeoutMs);
-  const links = extractPlayerLinksFromHtml(html, url);
-  if (!links.length) throw new Error('fetch returned no player links');
-  return links;
-}
-
 async function collectLinksForPage(tabId, cfg, pageNo) {
   // v1.5.2: Clean stable mode for Futbin.
   // No service-worker fetch and no parallel background link collection.
@@ -934,7 +614,7 @@ async function collectPlayerLinks(tabIds, cfg) {
 
 async function scrapePlayerPage(tabId, platform) {
   return runInTab(tabId, (platformArg) => {
-    const plat = (platformArg || 'ps').toLowerCase() === 'pc' ? 'pc' : 'ps';
+    const plat = platformArg;
     const box = document.querySelector(`.price-box.platform-${plat}-only`) || document.querySelector('.price-box');
     const parsePrice = (txt) => {
       if (!txt) return 0;
@@ -958,63 +638,7 @@ async function scrapePlayerPage(tabId, platform) {
       visiblePrices,
       url: location.href.split('#')[0]
     };
-  }, [platform]);
-}
-
-async function scrapeSalesPage(tabId) {
-  return runInTab(tabId, () => {
-    const parsePrice = (txt) => {
-      if (!txt) return 0;
-      let s = String(txt).trim().toUpperCase().replace(/\s+/g, '').replace(/,/g, '');
-      const m = s.match(/^(\d+(?:\.\d+)?)K$/);
-      if (m) return Math.round(parseFloat(m[1]) * 1000);
-      const digs = s.match(/\d+/g);
-      return digs ? parseInt(digs.join(''), 10) : 0;
-    };
-    const parseAbsoluteDate = (raw) => {
-      if (!raw) return -1;
-      const cleaned = String(raw).trim().replace(/\s+/g, ' ');
-      const candidates = [cleaned];
-      if (!/\b20\d{2}\b/.test(cleaned)) candidates.push(`${cleaned}, ${new Date().getFullYear()}`);
-      for (const candidate of candidates) {
-        const dt = new Date(candidate);
-        if (!Number.isNaN(dt.getTime())) return Math.max(0, Math.round((Date.now() - dt.getTime()) / 60000));
-      }
-      return -1;
-    };
-    const parseAgeMin = (txt, attrs = []) => {
-      const values = [txt, ...attrs].map(x => String(x || '').trim()).filter(Boolean);
-      for (const raw of values) {
-        const s = raw.toLowerCase();
-        if (s.includes('just now') || s === 'now') return 0;
-        const numMatch = s.match(/\d+/);
-        const n = numMatch ? parseInt(numMatch[0], 10) : ((s.includes('a ') || s.includes('an ')) ? 1 : -1);
-        if (n >= 0) {
-          if (s.includes('sec')) return 0;
-          if (s.includes('min')) return n;
-          if (s.includes('hour') || s.includes('hr')) return n * 60;
-          if (s.includes('day')) return n * 1440;
-          if (s.includes('week')) return n * 10080;
-        }
-        if (s.includes('yesterday')) return 1440;
-        const abs = parseAbsoluteDate(raw);
-        if (abs >= 0) return abs;
-      }
-      return -1;
-    };
-    return Array.from(document.querySelectorAll('table tbody tr')).slice(0, 90).map(r => {
-      const tds = r.querySelectorAll('td');
-      const timeEl = tds[0] ? (tds[0].querySelector('.sales-date-time, time, [title], [datetime], [data-original-title], [aria-label]') || tds[0]) : null;
-      const sold = tds[2] ? parsePrice(tds[2].textContent) : 0;
-      const age_min = parseAgeMin(timeEl ? timeEl.textContent : '', timeEl ? [
-        timeEl.getAttribute('title'),
-        timeEl.getAttribute('datetime'),
-        timeEl.getAttribute('data-original-title'),
-        timeEl.getAttribute('aria-label')
-      ].filter(Boolean) : []);
-      return { sold, age_min };
-    }).filter(x => x.sold > 0);
-  });
+  }, [normalizePlatform(platform)]);
 }
 
 async function processLink(tabId, link, cfg) {
@@ -1024,12 +648,7 @@ async function processLink(tabId, link, cfg) {
   if (!player || !player.first) return { accepted: false, reason: 'missing_player_price' };
   if (player.first < Number(cfg.price_min) || player.first > Number(cfg.price_max)) return { accepted: false, reason: 'price_out_of_range' };
 
-  const salesUrl = new URL(link.replace('/player/', '/sales/'));
-  salesUrl.searchParams.set('platform', (cfg.platform || 'ps').toLowerCase() === 'pc' ? 'pc' : 'ps');
-  await navigateTab(tabId, salesUrl.toString(), cfg);
-  await waitForConditionInTab(tabId, () => document.querySelectorAll('table tbody tr').length > 0, 9000);
-  const salesRows = await scrapeSalesPage(tabId);
-  const analysed = analysePlayer({ cfg, player, salesRows });
+  const analysed = analysePlayer({ player });
   if (analysed.accepted) {
     const exists = runtimeState.deals.some(d => d.url === analysed.deal.url && d.first === analysed.deal.first);
     if (!exists) runtimeState.deals.unshift({ ...analysed.deal, found_at: new Date().toISOString() });
@@ -1044,7 +663,7 @@ function bumpReject(reason) {
 }
 
 async function runSingleScan(tabIds, cfg) {
-  await setStatus('Sammle Spieler-Links parallel...', 0);
+  await setStatus('Sammle Special-Card-Links...', 0);
   const links = await collectPlayerLinks(tabIds, cfg);
   runtimeState.totalLinks = links.length;
   runtimeState.processed = 0;
